@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { contactSchema } from "@/lib/contact-schema";
-import { emailConfig, sendInquiry } from "@/lib/email";
+import { emailConfig, emailStatus, sendInquiry } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
 import { site } from "@/config/site";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
   }
 
   if (!emailConfig()) {
-    console.error("[contact] Email delivery is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.");
+    console.error("[contact] Email delivery is not configured.", JSON.stringify(emailStatus()));
     return json(
       {
         ok: false,
