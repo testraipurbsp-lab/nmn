@@ -1,0 +1,287 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0d10;
+  --color-paper: #f5f5f0;
+  --color-lime: #c6f55a;
+  --color-surface: #111419;
+  --color-elevated: #171b21;
+  --color-muted: #92979f;
+  --color-line: rgba(245, 245, 240, 0.1);
+  --color-line-strong: rgba(245, 245, 240, 0.22);
+  --color-glow: rgba(198, 245, 90, 0.15);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--color-ink);
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--color-lime);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Layout helpers */
+.container-x {
+  width: 100%;
+  max-width: 1360px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 768px) {
+  .container-x {
+    padding-inline: 2.5rem;
+  }
+}
+
+/* Display type: tight, large, editorial */
+.display {
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  text-wrap: balance;
+}
+.h-section {
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  font-size: clamp(2rem, 5.2vw, 4.25rem);
+  text-wrap: balance;
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Technical backdrop grid */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, #000 20%, transparent 75%);
+}
+
+/* Ambient lighting: flat radial, lime at very low alpha */
+.ambient {
+  background: radial-gradient(closest-side, var(--color-glow), transparent);
+}
+
+/* Marquee-free subtle drift used by hero particles (CSS only, cheap) */
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.25; }
+  50% { transform: translate3d(0, -14px, 0); opacity: 0.9; }
+}
+@keyframes scan {
+  0% { transform: translateY(-10%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(110%); opacity: 0; }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.animate-drift { animation: drift 5s ease-in-out infinite; }
+.animate-scan { animation: scan 6s linear infinite; }
+.animate-pulse-ring { animation: pulse-ring 2.4s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .animate-drift, .animate-scan, .animate-pulse-ring { animation: none; }
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Form controls */
+.field {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-line-strong);
+  padding: 0.85rem 0;
+  color: var(--color-paper);
+  font-size: 1rem;
+  transition: border-color 0.25s;
+}
+.field::placeholder { color: rgba(146, 151, 159, 0.7); }
+.field:hover { border-color: var(--color-muted); }
+.field:focus { outline: none; border-color: var(--color-lime); }
+.field[aria-invalid="true"] { border-color: #ff8a7a; }
+select.field { appearance: none; background-image: none; cursor: pointer; }
+select.field option { background: var(--color-elevated); color: var(--color-paper); }
+
+/* Skip link */
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: -4rem;
+  z-index: 100;
+  background: var(--color-lime);
+  color: var(--color-ink);
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  transition: top 0.2s;
+}
+.skip-link:focus { top: 1rem; }
+
+.prose-legal h2 { font-size: 1.35rem; font-weight: 500; letter-spacing: -0.02em; margin: 2.5rem 0 0.75rem; color: var(--color-paper); }
+.prose-legal p, .prose-legal li { color: var(--color-muted); line-height: 1.75; max-width: 68ch; }
+.prose-legal ul { list-style: disc; padding-left: 1.25rem; margin-top: 0.5rem; }
+.prose-legal a { color: var(--color-lime); text-underline-offset: 3px; text-decoration: underline; }
+
+/* Hero entrance: CSS only so the headline paints without waiting on hydration */
+@keyframes rise {
+  from { transform: translateY(105%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+.mask-line { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.mask-line > span {
+  display: block;
+  transform: translateY(105%);
+  animation: rise 1s var(--ease-out-expo) forwards;
+  animation-delay: var(--d, 0s);
+}
+.fade-in {
+  opacity: 0;
+  animation: fade-in 0.9s var(--ease-out-expo) forwards;
+  animation-delay: var(--d, 0s);
+}
+.draw {
+  stroke-dasharray: var(--len, 1000);
+  stroke-dashoffset: var(--len, 1000);
+  animation: draw 2.2s var(--ease-out-expo) forwards;
+  animation-delay: var(--d, 0s);
+}
+
+/* ---- Motion additions ---- */
+@keyframes marquee { to { transform: translateX(-50%); } }
+.marquee { animation: marquee 45s linear infinite; }
+.marquee-wrap {
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+}
+.marquee-wrap:hover .marquee { animation-play-state: paused; }
+
+@keyframes float { 50% { translate: 0 -12px; } }
+.animate-float { animation: float 7s ease-in-out infinite; }
+.animate-float-slow { animation: float 9s ease-in-out infinite reverse; }
+
+@keyframes type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.type-line {
+  clip-path: inset(0 100% 0 0);
+  animation: type var(--t, 1s) steps(var(--n, 20), end) forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes blink { 50% { opacity: 0; } }
+.caret { animation: blink 1s steps(1) infinite; }
+
+.spotlight { position: relative; }
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(198, 245, 90, 0.14), transparent 70%);
+}
+.spotlight:hover::before { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee, .marquee-rev, .animate-float, .animate-float-slow, .caret { animation: none; }
+  .type-line { clip-path: none; animation: none; }
+  .intro { display: none; }
+}
+
+
+
+/* ---- Intro splash ---- */
+@keyframes intro-draw { to { stroke-dashoffset: 0; } }
+.intro-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: intro-draw 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: var(--d, 0s); }
+@keyframes intro-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.intro-pop { transform-box: fill-box; transform-origin: center; opacity: 0; animation: intro-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; animation-delay: var(--d, 0s); }
+@keyframes intro-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.intro-text { opacity: 0; animation: intro-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: var(--d, 0s); }
+@keyframes intro-bar { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+.intro-bar { animation: intro-bar 2.2s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+.intro-glow { background: radial-gradient(circle, rgba(198, 245, 90, 0.12), transparent 65%); }
+
+/* ---- Marquee row 2 + footer wordmark ---- */
+@keyframes marquee-rev { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+.marquee-rev { animation: marquee-rev 60s linear infinite; }
+.outline-text { color: transparent; -webkit-text-stroke: 1px rgba(245, 245, 240, 0.35); }
+.wordmark {
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(245, 245, 240, 0.16);
+  background: linear-gradient(180deg, rgba(198, 245, 90, 0.22), transparent 75%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+
+
+
+/* ---- Intro splash ---- */
+@keyframes intro-draw { to { stroke-dashoffset: 0; } }
+.intro-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: intro-draw 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: var(--d, 0s); }
+@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
+.intro-fill { opacity: 0; animation: intro-fade 0.6s ease forwards 0.3s; }
+@keyframes intro-pop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+.intro-pop { transform-box: fill-box; transform-origin: center; opacity: 0; animation: intro-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; animation-delay: var(--d, 0s); }
+.intro-glow { background: radial-gradient(circle, rgba(198, 245, 90, 0.13), transparent 65%); animation: intro-fade 1.2s ease both; }
+.intro-grid { opacity: 0.6; mask-image: radial-gradient(circle at 50% 50%, #000, transparent 65%); -webkit-mask-image: radial-gradient(circle at 50% 50%, #000, transparent 65%); animation: intro-fade 1.2s ease both; }
+.intro-meta { animation: intro-fade 0.6s ease both 0.2s; }
+
+/* Exit: the curtain lifts, the content drifts up and softens. */
+.intro { transition: transform 0.9s cubic-bezier(0.76, 0, 0.24, 1); }
+.intro-content { transition: transform 0.9s cubic-bezier(0.76, 0, 0.24, 1), opacity 0.5s ease; }
+.intro[data-phase="out"] { transform: translateY(-100%); }
+.intro[data-phase="out"] .intro-content { transform: translateY(12vh) scale(0.96); opacity: 0; }
+
+
+
+.intro-seen .intro { display: none; }
+
+
+/* Hold the page's entrance animations until the intro lifts. */
+.intro-active .mask-line > span,
+.intro-active .fade-in,
+.intro-active .draw { animation-play-state: paused; }
