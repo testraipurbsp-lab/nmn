@@ -1,59 +1,48 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MessageCircle, Send, X } from "lucide-react";
-import { contactSchema } from "@/lib/contact-schema";
-import { budgetOptions, services, timelineOptions } from "@/data/services";
+import { MENU_CHIPS, OPENING, afterSend, initialBrain, respond, type Brain, type Lead } from "@/lib/chat-brain";
 
-type Msg = { from: "bot" | "user"; text: string };
-type Step =
-  | "menu"
-  | "service"
-  | "budget"
-  | "timeline"
-  | "message"
-  | "name"
-  | "email"
-  | "retry"
-  | "done";
-type Lead = {
-  service?: string;
-  budget?: string;
-  timeline?: string;
-  message?: string;
-  name?: string;
-  email?: string;
-};
+type Msg = { id: number; from: "bot" | "user"; text: string };
 
-const START = "Start a project";
-const AGAIN = "Start over";
-const RETRY = "Try sending again";
-
-const greeting: Msg = {
-  from: "bot",
-  text: "Hi! I can tell you what NMN.DEV builds, or take your project details and send them to the team. Pick a topic below.",
-};
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([greeting]);
-  const [step, setStep] = useState<Step>("menu");
-  const [lead, setLead] = useState<Lead>({});
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [chips, setChips] = useState<string[]>([]);
+  const [typing, setTyping] = useState(false);
   const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState(false);
+
+  const brain = useRef<Brain>(initialBrain());
+  const queue = useRef<string[]>([]);
+  const running = useRef(false);
+  const started = useRef(false);
+  const alive = useRef(true);
+  const nextId = useRef(1);
+  const speed = useRef(1);
   const logRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [messages, step, open]);
+    alive.current = true;
+    speed.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0.2 : 1;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setHint(true), 4000);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, typing, chips, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,153 +51,106 @@ export function ChatWidget() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  useEffect(() => {
-    if (open && ["message", "name", "email"].includes(step)) inputRef.current?.focus();
-  }, [open, step]);
+  const push = useCallback((from: Msg["from"], text: string) => {
+    setMessages((m) => [...m, { id: nextId.current++, from, text }]);
+  }, []);
 
-  const say = (...m: Msg[]) => setMessages((prev) => [...prev, ...m]);
-  const user = (text: string): Msg => ({ from: "user", text });
-  const bot = (text: string): Msg => ({ from: "bot", text });
+  /** Show bot messages one by one, with a typing indicator sized to the message. */
+  const speak = useCallback(
+    async (lines: string[]) => {
+      for (const line of lines) {
+        if (!alive.current) return;
+        setTyping(true);
+        await sleep((450 + Math.min(line.length * 14, 1300)) * speed.current);
+        if (!alive.current) return;
+        setTyping(false);
+        push("bot", line);
+        await sleep(220 * speed.current);
+      }
+    },
+    [push],
+  );
 
-  const chips: string[] =
-    step === "menu"
-      ? [...services.map((s) => s.title), START]
-      : step === "service"
-        ? [...services.map((s) => s.formValue), "Other"]
-        : step === "budget"
-          ? [...budgetOptions]
-          : step === "timeline"
-            ? [...timelineOptions]
-            : step === "retry"
-              ? [RETRY]
-              : step === "done"
-                ? [AGAIN]
-                : [];
-
-  const reset = () => {
-    setMessages([greeting]);
-    setLead({});
-    setStep("menu");
-    setInput("");
-  };
-
-  const send = async (data: Lead) => {
-    setBusy(true);
+  const post = async (lead: Lead) => {
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          service: data.service,
-          budget: data.budget,
-          timeline: data.timeline,
-          message: `[Sent via website chatbot]\n\n${data.message}`,
+          name: lead.name,
+          email: lead.email,
+          service: lead.service,
+          budget: lead.budget || undefined,
+          timeline: lead.timeline || undefined,
+          message: `[Sent via website chatbot]\n\n${lead.message}`,
         }),
       });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (res.ok && body?.ok) {
-        say(
-          bot(
-            `Thanks ${data.name?.split(" ")[0]}, your details are with the team. They'll reply to ${data.email} soon.`,
-          ),
-        );
-        setStep("done");
-      } else {
-        say(
-          bot(
-            `${body?.error ?? "Something went wrong."} You can try again, or use the contact page at /contact.`,
-          ),
-        );
-        setStep("retry");
-      }
+      return res.ok && body?.ok ? { ok: true } : { ok: false, error: body?.error };
     } catch {
-      say(bot("Network error. Check your connection and try again."));
-      setStep("retry");
-    } finally {
-      setBusy(false);
+      return { ok: false, error: "Network error. Check your connection." };
     }
   };
 
-  const onChip = (label: string) => {
-    if (busy) return;
-    say(user(label));
+  /** Handle queued visitor messages one at a time, so quick typists never get tangled replies. */
+  const drain = useCallback(async () => {
+    if (running.current) return;
+    running.current = true;
+    while (queue.current.length && alive.current) {
+      const text = queue.current.shift() as string;
+      setChips([]);
+      await sleep(350 * speed.current);
+      const r = respond(brain.current, text);
+      brain.current = r.brain;
+      await speak(r.say);
+      if (r.send) {
+        const lead = brain.current.lead;
+        const result = await post(lead);
+        const after = afterSend(brain.current, result);
+        brain.current = after.brain;
+        await speak(after.say);
+        setChips(after.chips);
+      } else {
+        setChips(r.chips);
+      }
+    }
+    running.current = false;
+  }, [speak]);
 
-    if (step === "menu") {
-      if (label === START) {
-        if (lead.service) {
-          say(bot("Great. What budget range do you have in mind?"));
-          setStep("budget");
-        } else {
-          say(bot("Which service do you need?"));
-          setStep("service");
-        }
-        return;
-      }
-      const s = services.find((x) => x.title === label);
-      if (s) {
-        setLead((l) => ({ ...l, service: s.formValue }));
-        say(
-          bot(
-            `${s.title}: ${s.overview}\n\nWhat we cover: ${s.capabilities.slice(0, 4).join(", ")}.\nTechnologies: ${s.technologies.join(", ")}.`,
-          ),
-          bot("Ask about another service, or choose Start a project."),
-        );
-      }
-      return;
-    }
-    if (step === "service") {
-      setLead((l) => ({ ...l, service: label }));
-      say(bot("What budget range do you have in mind?"));
-      setStep("budget");
-    } else if (step === "budget") {
-      setLead((l) => ({ ...l, budget: label }));
-      say(bot("When do you need it?"));
-      setStep("timeline");
-    } else if (step === "timeline") {
-      setLead((l) => ({ ...l, timeline: label }));
-      say(bot("Describe what you want to build in a few sentences."));
-      setStep("message");
-    } else if (step === "retry") {
-      void send(lead);
-    } else if (step === "done") {
-      reset();
-    }
-  };
+  const say = useCallback(
+    (text: string) => {
+      const value = text.trim();
+      if (!value) return;
+      push("user", value);
+      queue.current.push(value);
+      void drain();
+    },
+    [drain, push],
+  );
+
+  // Greet the first time the chat opens.
+  useEffect(() => {
+    if (!open || started.current) return;
+    started.current = true;
+    void (async () => {
+      running.current = true;
+      await speak(OPENING);
+      setChips(MENU_CHIPS);
+      running.current = false;
+      if (queue.current.length) void drain();
+    })();
+  }, [open, speak, drain]);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open, chips]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const value = input.trim();
-    if (!value || busy) return;
+    const v = input;
     setInput("");
-
-    if (step === "message") {
-      const r = contactSchema.shape.message.safeParse(value);
-      say(user(value));
-      if (!r.success) return say(bot(r.error.issues[0]?.message ?? "Please add more detail."));
-      setLead((l) => ({ ...l, message: r.data }));
-      say(bot("Thanks. What's your name?"));
-      setStep("name");
-    } else if (step === "name") {
-      const r = contactSchema.shape.name.safeParse(value);
-      say(user(value));
-      if (!r.success) return say(bot(r.error.issues[0]?.message ?? "Enter your full name."));
-      setLead((l) => ({ ...l, name: r.data }));
-      say(bot("And your email address, so the team can reply?"));
-      setStep("email");
-    } else if (step === "email") {
-      const r = contactSchema.shape.email.safeParse(value);
-      say(user(value));
-      if (!r.success) return say(bot(r.error.issues[0]?.message ?? "Enter a valid email address."));
-      const next = { ...lead, email: r.data };
-      setLead(next);
-      say(bot("Sending your details…"));
-      void send(next);
-    }
+    say(v);
   };
-
-  const typing = ["message", "name", "email"].includes(step);
 
   return (
     <>
@@ -217,16 +159,22 @@ export function ChatWidget() {
           <motion.div
             role="dialog"
             aria-label="NMN.DEV assistant"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-20 right-4 z-30 flex h-[min(560px,calc(100dvh-7rem))] w-[calc(100vw-2rem)] flex-col border border-line-strong bg-surface shadow-2xl sm:w-[380px]"
+            className="fixed bottom-20 right-4 z-30 flex h-[min(600px,calc(100dvh-7rem))] w-[calc(100vw-2rem)] flex-col border border-line-strong bg-surface shadow-2xl sm:w-[390px]"
           >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">NMN.DEV assistant</p>
-                <p className="text-xs text-muted">Services info and project enquiries</p>
+              <div className="flex items-center gap-3">
+                <span className="relative flex size-9 items-center justify-center rounded-full border border-line-strong bg-ink text-[0.7rem] font-semibold tracking-tight text-lime">
+                  NMN
+                  <span aria-hidden className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-surface bg-lime" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium leading-tight">NMN.DEV assistant</p>
+                  <p className="text-xs text-muted">{typing ? "typing…" : "Ask anything or share your project"}</p>
+                </div>
               </div>
               <button
                 type="button"
@@ -238,17 +186,14 @@ export function ChatWidget() {
               </button>
             </div>
 
-            <div
-              ref={logRef}
-              role="log"
-              aria-live="polite"
-              className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
-            >
-              {messages.map((m, i) => (
-                <div key={i} className={m.from === "user" ? "flex justify-end" : "flex"}>
+            <div ref={logRef} role="log" aria-live="polite" className="flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
+              {messages.map((m) => (
+                <div key={m.id} className={`chat-in flex ${m.from === "user" ? "justify-end" : ""}`}>
                   <p
-                    className={`max-w-[88%] whitespace-pre-line px-3 py-2 text-sm leading-relaxed ${
-                      m.from === "user" ? "bg-lime text-ink" : "bg-elevated text-paper"
+                    className={`max-w-[86%] whitespace-pre-line px-3.5 py-2.5 text-sm leading-relaxed ${
+                      m.from === "user"
+                        ? "rounded-2xl rounded-br-sm bg-lime text-ink"
+                        : "rounded-2xl rounded-bl-sm bg-elevated text-paper"
                     }`}
                   >
                     {m.text}
@@ -256,15 +201,27 @@ export function ChatWidget() {
                 </div>
               ))}
 
-              {chips.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
+              {typing && (
+                <div className="chat-in flex">
+                  <p
+                    className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-elevated px-4 py-3.5"
+                    aria-label="Assistant is typing"
+                  >
+                    <span className="typing-dot" />
+                    <span className="typing-dot" style={{ animationDelay: "0.15s" }} />
+                    <span className="typing-dot" style={{ animationDelay: "0.3s" }} />
+                  </p>
+                </div>
+              )}
+
+              {chips.length > 0 && !typing && (
+                <div className="chat-in flex flex-wrap gap-2 pt-1">
                   {chips.map((c) => (
                     <button
                       key={c}
                       type="button"
-                      disabled={busy}
-                      onClick={() => onChip(c)}
-                      className="border border-line-strong px-3 py-1.5 text-left text-sm text-paper transition-colors hover:border-lime hover:text-lime disabled:opacity-50"
+                      onClick={() => say(c)}
+                      className="rounded-full border border-line-strong px-3 py-1.5 text-left text-[0.82rem] text-paper transition-colors hover:border-lime hover:text-lime"
                     >
                       {c}
                     </button>
@@ -282,18 +239,17 @@ export function ChatWidget() {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                disabled={!typing || busy}
-                maxLength={2000}
-                type={step === "email" ? "email" : "text"}
-                autoComplete={step === "email" ? "email" : step === "name" ? "name" : "off"}
-                placeholder={typing ? "Type your answer" : "Choose an option above"}
-                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-paper placeholder:text-muted focus:outline-none disabled:opacity-60"
+                maxLength={1000}
+                type="text"
+                autoComplete="off"
+                placeholder="Type a message…"
+                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-paper placeholder:text-muted focus:outline-none"
               />
               <button
                 type="submit"
-                disabled={!typing || busy || !input.trim()}
+                disabled={!input.trim()}
                 aria-label="Send"
-                className="inline-flex size-9 items-center justify-center bg-lime text-ink disabled:opacity-40"
+                className="inline-flex size-9 items-center justify-center rounded-full bg-lime text-ink transition-opacity disabled:opacity-40"
               >
                 <Send className="size-4" />
               </button>
