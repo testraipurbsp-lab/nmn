@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MessageCircle, Send, X } from "lucide-react";
 import { MENU_CHIPS, OPENING, afterSend, initialBrain, respond, type Brain, type Lead } from "@/lib/chat-brain";
+import { SantaHat } from "./SantaHat";
 
 type Msg = { id: number; from: "bot" | "user"; text: string };
 
@@ -16,6 +17,7 @@ export function ChatWidget() {
   const [typing, setTyping] = useState(false);
   const [input, setInput] = useState("");
   const [hint, setHint] = useState(false);
+  const [festive, setFestive] = useState(false);
 
   const brain = useRef<Brain>(initialBrain());
   const queue = useRef<string[]>([]);
@@ -35,10 +37,18 @@ export function ChatWidget() {
     };
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => setHint(true), 4000);
-    return () => clearTimeout(t);
-  }, []);
+useEffect(() => {
+  const t = setTimeout(() => setHint(true), 4000);
+  // Santa hat from November to early January. Force with NEXT_PUBLIC_WINTER=on or off.
+  const force = process.env.NEXT_PUBLIC_WINTER;
+  const d = new Date();
+  const season = d.getMonth() >= 10 || (d.getMonth() === 0 && d.getDate() <= 6);
+  const t2 = setTimeout(() => setFestive(force === "on" ? true : force === "off" ? false : season), 0);
+  return () => {
+    clearTimeout(t);
+    clearTimeout(t2);
+  };
+}, []);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -170,6 +180,7 @@ export function ChatWidget() {
                 <span className="relative flex size-9 items-center justify-center rounded-full border border-line-strong bg-ink text-[0.7rem] font-semibold tracking-tight text-lime">
                   NMN
                   <span aria-hidden className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-surface bg-lime" />
+                  {festive && <SantaHat className="-right-2 -top-3.5 w-[26px] rotate-[14deg]" />}
                 </span>
                 <div>
                   <p className="text-sm font-medium leading-tight">NMN.DEV assistant</p>
@@ -283,6 +294,7 @@ export function ChatWidget() {
       >
         {!open && <span aria-hidden className="animate-pulse-ring absolute inset-0 -z-10 rounded-full bg-lime/40" />}
         {open ? <X className="size-6" /> : <MessageCircle className="size-6" />}
+        {festive && <SantaHat className="-right-2 -top-4 w-[34px] rotate-[14deg]" />}
       </button>
     </>
   );

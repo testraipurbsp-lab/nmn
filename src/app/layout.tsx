@@ -9,6 +9,7 @@ import { ChatWidget } from "@/components/chat/ChatWidget";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { site } from "@/config/site";
 import { IntroSplash } from "@/components/brand/IntroSplash";
+import { SnowFall } from "@/components/motion/SnowFall";
 
 export const viewport: Viewport = {
   themeColor: "#0B0D10",
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">{children}</main>
         <Footer />
         <ChatWidget />
+        <SnowFall />
         <JsonLd data={organization} />
       </body>
     </html>
