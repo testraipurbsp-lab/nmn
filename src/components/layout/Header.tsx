@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { buttonStyles } from "@/components/ui/Button";
 import { mainNav } from "@/config/navigation";
+import { SnowRoof } from "./SnowCap";
 
 const isActive = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -51,10 +52,12 @@ export function Header() {
         scrolled || open ? "border-line bg-ink/85 backdrop-blur-md" : "border-transparent bg-ink/40"
       }`}
     >
+   
       <div className="container-x flex h-[72px] items-center justify-between">
-        <Link href="/" aria-label="NMN.DEV home" className="relative z-[60]">
-          <Logo />
-        </Link>
+        <Link href="/" aria-label="NMN.DEV home" className="relative z-[60] inline-flex">
+  <SnowRoof className="!left-[42px] !right-0 !w-auto" />
+  <Logo />
+</Link>
 
         <nav aria-label="Main" className="hidden md:block">
           <ul className="flex items-center gap-9">
@@ -86,9 +89,12 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/contact" className={buttonStyles("primary", "max-md:hidden !py-2.5")}>
-            Let&apos;s Talk
-          </Link>
+        <span className="relative inline-flex max-md:hidden">
+  <SnowRoof />
+  <Link href="/contact" className={buttonStyles("primary", "!py-2.5")}>
+    Let&apos;s Talk
+  </Link>
+</span>
           <button
             type="button"
             className="relative z-[60] -mr-2 inline-flex size-11 items-center justify-center text-paper md:hidden"

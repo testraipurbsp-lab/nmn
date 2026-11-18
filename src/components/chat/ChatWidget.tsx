@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MessageCircle, Send, X } from "lucide-react";
-import { MENU_CHIPS, OPENING, afterSend, initialBrain, respond, type Brain, type Lead } from "@/lib/chat-brain";
 import { SantaHat } from "./SantaHat";
+import { MENU_CHIPS, OPENING, afterSend, initialBrain, respond, type Brain, type Lead } from "@/lib/chat-brain";
 
 type Msg = { id: number; from: "bot" | "user"; text: string };
 
@@ -18,6 +18,7 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [hint, setHint] = useState(false);
   const [festive, setFestive] = useState(false);
+  const [vv, setVv] = useState<{ h: number; top: number } | null>(null);
 
   const brain = useRef<Brain>(initialBrain());
   const queue = useRef<string[]>([]);
@@ -37,18 +38,18 @@ export function ChatWidget() {
     };
   }, []);
 
-useEffect(() => {
-  const t = setTimeout(() => setHint(true), 4000);
-  // Santa hat from November to early January. Force with NEXT_PUBLIC_WINTER=on or off.
-  const force = process.env.NEXT_PUBLIC_WINTER;
-  const d = new Date();
-  const season = d.getMonth() >= 10 || (d.getMonth() === 0 && d.getDate() <= 6);
-  const t2 = setTimeout(() => setFestive(force === "on" ? true : force === "off" ? false : season), 0);
-  return () => {
-    clearTimeout(t);
-    clearTimeout(t2);
-  };
-}, []);
+  useEffect(() => {
+    const t = setTimeout(() => setHint(true), 4000);
+    // Santa hat from November to early January. Force with NEXT_PUBLIC_WINTER=on or off.
+    const force = process.env.NEXT_PUBLIC_WINTER;
+    const d = new Date();
+    const season = d.getMonth() >= 10 || (d.getMonth() === 0 && d.getDate() <= 6);
+    const t2 = setTimeout(() => setFestive(force === "on" ? true : force === "off" ? false : season), 0);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(t2);
+    };
+  }, []);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -59,6 +60,30 @@ useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // On phones the chat is a full-screen sheet that follows the visible area (keyboard, browser bars).
+  useEffect(() => {
+    if (!open) return;
+    const mq = window.matchMedia("(max-width: 639px)");
+    const vp = window.visualViewport;
+    const root = document.documentElement;
+    const prev = root.style.overflow;
+    const apply = () => {
+      setVv(mq.matches && vp ? { h: vp.height, top: vp.offsetTop } : null);
+      root.style.overflow = mq.matches ? "hidden" : prev;
+    };
+    const t = setTimeout(apply, 0);
+    vp?.addEventListener("resize", apply);
+    vp?.addEventListener("scroll", apply);
+    mq.addEventListener("change", apply);
+    return () => {
+      clearTimeout(t);
+      vp?.removeEventListener("resize", apply);
+      vp?.removeEventListener("scroll", apply);
+      mq.removeEventListener("change", apply);
+      root.style.overflow = prev;
+    };
   }, [open]);
 
   const push = useCallback((from: Msg["from"], text: string) => {
@@ -173,9 +198,10 @@ useEffect(() => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-20 right-4 z-30 flex h-[min(600px,calc(100dvh-7rem))] w-[calc(100vw-2rem)] flex-col border border-line-strong bg-surface shadow-2xl sm:w-[390px]"
+            style={vv ? { height: vv.h, top: vv.top } : undefined}
+            className="fixed z-[70] flex flex-col bg-surface shadow-2xl max-sm:inset-x-0 max-sm:top-0 max-sm:h-dvh sm:bottom-20 sm:right-4 sm:z-30 sm:h-[min(600px,calc(100dvh-7rem))] sm:w-[390px] sm:border sm:border-line-strong"
           >
-            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <div className="flex items-center justify-between border-b border-line px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
               <div className="flex items-center gap-3">
                 <span className="relative flex size-9 items-center justify-center rounded-full border border-line-strong bg-ink text-[0.7rem] font-semibold tracking-tight text-lime">
                   NMN
@@ -191,13 +217,13 @@ useEffect(() => {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close chat"
-                className="inline-flex size-9 items-center justify-center text-muted hover:text-paper"
+                className="inline-flex size-11 items-center justify-center text-muted hover:text-paper sm:size-9"
               >
                 <X className="size-5" />
               </button>
             </div>
 
-            <div ref={logRef} role="log" aria-live="polite" className="flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
+            <div ref={logRef} role="log" aria-live="polite" className="flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-4 py-4">
               {messages.map((m) => (
                 <div key={m.id} className={`chat-in flex ${m.from === "user" ? "justify-end" : ""}`}>
                   <p
@@ -241,7 +267,7 @@ useEffect(() => {
               )}
             </div>
 
-            <form onSubmit={onSubmit} noValidate className="flex items-center gap-2 border-t border-line p-3">
+            <form onSubmit={onSubmit} noValidate className="flex items-center gap-2 border-t border-line px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
               <label htmlFor="chat-input" className="sr-only">
                 Your message
               </label>
@@ -254,13 +280,13 @@ useEffect(() => {
                 type="text"
                 autoComplete="off"
                 placeholder="Type a message…"
-                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-paper placeholder:text-muted focus:outline-none"
+                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-base text-paper sm:text-sm placeholder:text-muted focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={!input.trim()}
                 aria-label="Send"
-                className="inline-flex size-9 items-center justify-center rounded-full bg-lime text-ink transition-opacity disabled:opacity-40"
+                className="inline-flex size-11 items-center justify-center rounded-full bg-lime text-ink transition-opacity disabled:opacity-40 sm:size-9"
               >
                 <Send className="size-4" />
               </button>
